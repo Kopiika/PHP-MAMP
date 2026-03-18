@@ -341,14 +341,21 @@ $app->post('/api/products/upload-image', function (Request $request, Response $r
     }
 
     // --- GENERATE UNIQUE FILENAME ---
-    $filename = uniqid() . '-' . $file->getClientFilename();
+    $originalName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientFilename());
+    $filename = uniqid() . '-' . $originalName;
 
     // --- UPLOAD TO SUPABASE STORAGE ---
     $auth = new SupabaseAuth();
     $auth->setToken($request->getAttribute('token'));
 
     $fileData = (string) $file->getStream();
-    $auth->uploadFile('product-images', $filename, $fileData, $file->getClientMediaType());
+
+    try {
+        $auth->uploadFile('product-images', $filename, $fileData, $file->getClientMediaType());
+    } catch (\Exception $e) {
+        $response->getBody()->write(json_encode(['error' => $e->getMessage()]));
+        return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
+    }
 
     // --- RETURN PUBLIC URL ---
     $publicUrl = $auth->getPublicUrl('product-images', $filename);
